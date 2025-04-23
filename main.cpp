@@ -2,6 +2,12 @@
 #include <cstdint>
 #include <string>
 #include <format>
+#include <d3d12.h>
+#include <dxgi1_6.h>
+#include <cassert>
+
+#pragma comment(lib,"d3d12.lib")
+#pragma comment(lib,"dxgi.lib")
 
 
 
@@ -59,6 +65,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
+	IDXGIFactory7* dxgiFactory = nullptr;
+
+	HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory));
+
+	assert(SUCCEEDED(hr));
+
 	WNDCLASS wc{};
 
 	wc.lpfnWndProc = WindowProc;
@@ -91,6 +103,47 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ShowWindow(hwnd, SW_SHOW);
 
 	MSG msg{};
+
+	IDXGIAdapter4* useAdapter = nullptr;
+
+	for (UINT i = 0; dxgiFactory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&useAdapter)) != DXGI_ERROR_NOT_FOUND; ++i)
+	{
+		DXGI_ADAPTER_DESC3 adapteDesc{};
+
+		hr = useAdapter->GetDesc3(&adapteDesc);
+		assert(SUCCEEDED(hr));
+
+		if (!(adapteDesc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE))
+		{
+			Log(ConvertString(std::format(L"Use Adapter:{}\n", adapteDesc.Description)));
+			break;
+		}
+		useAdapter = nullptr;
+	}
+	assert(useAdapter != nullptr
+	);
+
+	ID3D12Device* device = nullptr;
+
+	D3D_FEATURE_LEVEL featureLevels[] =
+	{
+		D3D_FEATURE_LEVEL_12_2,D3D_FEATURE_LEVEL_12_1,D3D_FEATURE_LEVEL_12_0
+	};
+
+	const char* featureLevelsStrings[] = { "12.2","12.1","12.0" };
+
+	for (size_t i = 0; i < _countof(featureLevels); ++i)
+	{
+		hr = D3D12CreateDevice(useAdapter, featureLevels[i], IID_PPV_ARGS(&device));
+		if (SUCCEEDED(hr))
+		{
+			Log(std::format("FeatureLevel : {}\n", featureLevelsStrings[i]));
+			break;
+		}
+	}
+	assert(device != nullptr);
+	Log("Complete create D3D12Device!!!\n");
+
 
 	Log(ConvertString(std::format(L"WSTRING{}\n", L"abc")));
 
