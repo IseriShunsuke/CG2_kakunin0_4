@@ -709,7 +709,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	scissorRect.bottom = kClientHeight;
 
 	Transform transform{ {1.0f,1.0f,1.0f,},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-	Transform cameratransform{ {1.0f,1.0f,1.0f,},{0.0f,0.0f,0.0f},{0.0f,0.0f,-15.0f} };
+	Transform cameratransform{ {1.0f,1.0f,1.0f,},{0.0f,0.0f,0.0f},{0.0f,0.0f,-5.0f} };
+
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+
+	Matrix4x4* wvpData = nullptr;
+
+	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+
+	*wvpData = MakeIdentity4x4();
+
 
 
 	while (msg.message != WM_QUIT)
@@ -722,24 +731,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 		else
 		{
-			ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
-
-			Matrix4x4* wvpData = nullptr;
-
-			wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
-
-			transform.rotate.y += 0.03f;
-			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-
-			Matrix4x4 cameraMatrix = MakeAffineMatrix(cameratransform.scale, cameratransform.rotate, cameratransform.translate);
-
-			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-
-			Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
-
-			Matrix4x4 worldVeiwProjectionMatrix = Multiply(worldMatrix,Multiply(viewMatrix, projectionMatrix));
-
-			*wvpData = worldVeiwProjectionMatrix;
 
 			UINT buckBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -754,6 +745,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+			transform.rotate.y += 0.03f;
+			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+
+			*wvpData = worldMatrix;
+
+			/*Matrix4x4 cameraMatrix = MakeAffineMatrix(cameratransform.scale, cameratransform.rotate, cameratransform.translate);
+
+			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
+
+			Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+
+			Matrix4x4 worldVeiwProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));*/
+
+			/**wvpData = worldVeiwProjectionMatrix;*/
 
 			commandList->ResourceBarrier(1, &barrier);
 
@@ -823,6 +829,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	commandAllocator->Release();
 	commandQueue->Release();
 	materialResource->Release();
+	wvpResource->Release();
 	device->Release();
 	useAdapter->Release();
 	dxgiFactory->Release();
