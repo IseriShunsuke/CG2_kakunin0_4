@@ -40,7 +40,7 @@ struct Transform {
 	Vector3 translate;
 };
 
-// ’PˆÊs—ñ
+// å˜ä½è¡Œåˆ—
 Matrix4x4 MakeIdentity4x4() {
 	Matrix4x4 identity;
 	identity.m[0][0] = 1.0f;	identity.m[0][1] = 0.0f;	identity.m[0][2] = 0.0f;	identity.m[0][3] = 0.0f;
@@ -50,7 +50,7 @@ Matrix4x4 MakeIdentity4x4() {
 	return identity;
 }
 
-// 4x4‚ÌŠ|‚¯ŽZ
+// 4x4ã®æŽ›ã‘ç®—
 Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2) {
 	Matrix4x4 result;
 	result.m[0][0] = m1.m[0][0] * m2.m[0][0] + m1.m[0][1] * m2.m[1][0] + m1.m[0][2] * m2.m[2][0] + m1.m[0][3] * m2.m[3][0];
@@ -76,7 +76,7 @@ Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2) {
 	return result;
 }
 
-// XŽ²‚Å‰ñ“]
+// Xè»¸ã§å›žè»¢
 Matrix4x4 MakeRotateXMatrix(float radian) {
 	float cosTheta = std::cos(radian);
 	float sinTheta = std::sin(radian);
@@ -86,7 +86,7 @@ Matrix4x4 MakeRotateXMatrix(float radian) {
 			0.0f, 0.0f, 0.0f, 1.0f };
 }
 
-// YŽ²‚Å‰ñ“]
+// Yè»¸ã§å›žè»¢
 Matrix4x4 MakeRotateYMatrix(float radian) {
 	float cosTheta = std::cos(radian);
 	float sinTheta = std::sin(radian);
@@ -96,7 +96,7 @@ Matrix4x4 MakeRotateYMatrix(float radian) {
 			0.0f, 0.0f, 0.0f, 1.0f };
 }
 
-// ZŽ²‚Å‰ñ“]
+// Zè»¸ã§å›žè»¢
 Matrix4x4 MakeRotateZMatrix(float radian) {
 	float cosTheta = std::cos(radian);
 	float sinTheta = std::sin(radian);
@@ -106,7 +106,7 @@ Matrix4x4 MakeRotateZMatrix(float radian) {
 			0.0f, 0.0f, 0.0f, 1.0f };
 }
 
-// Affine•ÏŠ·
+// Affineå¤‰æ›
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate) {
 	Matrix4x4 result = Multiply(Multiply(MakeRotateXMatrix(rotate.x), MakeRotateYMatrix(rotate.y)), MakeRotateZMatrix(rotate.z));
 	result.m[0][0] *= scale.x;
@@ -828,6 +828,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	dxgiFactory->Release();
 	graphicsPipelineState->Release();
 	signatureBlob->Release();
+	
+	
 	if (errorBlob)
 	{
 		errorBlob->Release();
