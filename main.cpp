@@ -25,6 +25,19 @@
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+
+struct Vector2
+{
+	float x;
+	float y;
+};
+
+struct Vector3 {
+	float x;
+	float y;
+	float z;
+};
+
 struct Vector4
 {
 	float x;
@@ -37,10 +50,10 @@ struct Matrix4x4 {
 	float m[4][4];
 };
 
-struct Vector3 {
-	float x;
-	float y;
-	float z;
+struct VertexData
+{
+	Vector4 position;
+	Vector2 texcode;
 };
 
 struct Transform {
@@ -426,7 +439,7 @@ ID3D12Resource* CreateTextureResource(ID3D12Device* device, const DirectX::TexMe
 {
 	D3D12_RESOURCE_DESC resourceDesc{};
 	resourceDesc.Width = UINT(metaData.width);
-	resourceDesc.Width = UINT(metaData.height);
+	resourceDesc.Height = UINT(metaData.height);
 	resourceDesc.MipLevels = UINT16(metaData.mipLevels);
 	resourceDesc.DepthOrArraySize = UINT16(metaData.arraySize);
 	resourceDesc.Format = metaData.format;
@@ -683,16 +696,42 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
 
-	D3D12_ROOT_PARAMETER rootParameter[2] = {};
+	D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
+	descriptorRange[0].BaseShaderRegister = 0;
+	descriptorRange[0].NumDescriptors = 1;
+	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+
+	D3D12_ROOT_PARAMETER rootParameter[3] = {};
 	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameter[0].Descriptor.ShaderRegister = 0;
 	rootParameter[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameter[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 	rootParameter[1].Descriptor.ShaderRegister = 0;
+	rootParameter[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameter[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameter[2].DescriptorTable.pDescriptorRanges = descriptorRange;
+	rootParameter[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
 
 	descriptionRootSignature.pParameters = rootParameter;
 	descriptionRootSignature.NumParameters = _countof(rootParameter);
+
+
+	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
+	staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+	staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	staticSamplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	staticSamplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+	staticSamplers[0].MaxLOD = D3D12_FLOAT32_MAX;
+	staticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	descriptionRootSignature.pStaticSamplers = staticSamplers;
+	descriptionRootSignature.NumStaticSamplers = _countof(staticSamplers);
+
+
 
 	ID3DBlob* signatureBlob = nullptr;
 	ID3DBlob* errorBlob = nullptr;
@@ -711,11 +750,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	assert(SUCCEEDED(hr));
 
-	D3D12_INPUT_ELEMENT_DESC inputElementDesc[1] = {};
+	D3D12_INPUT_ELEMENT_DESC inputElementDesc[2] = {};
 	inputElementDesc[0].SemanticName = "POSITION";
 	inputElementDesc[0].SemanticIndex = 0;
 	inputElementDesc[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	inputElementDesc[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDesc[1].SemanticName = "TEXCOORD";
+	inputElementDesc[1].SemanticIndex = 0;
+	inputElementDesc[1].Format = DXGI_FORMAT_R32G32_FLOAT;
+	inputElementDesc[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	inputLayoutDesc.pInputElementDescs = inputElementDesc;
@@ -760,11 +803,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
+
+	
+
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 3);
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
 	Vector4* materialData = nullptr;
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-	*materialData = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+	*materialData = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
 
 
@@ -772,19 +818,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
 
-	vertexBufferView.SizeInBytes = sizeof(Vector4) * 3;
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * 3;
 
-	vertexBufferView.StrideInBytes = sizeof(Vector4);
+	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
-	Vector4* vertexDate = nullptr;
+
+	VertexData* vertexDate = nullptr;
 
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexDate));
 
-	vertexDate[0] = { -0.5f,-0.5f,0.0f,1.0f };
+	vertexDate[0].position = { -0.5f,-0.5f,0.0f,1.0f };
+	vertexDate[0].texcode = { 0.0f,1.0f };
 
-	vertexDate[1] = { 0.0f,0.5f,0.0f,1.0f };
+	vertexDate[1].position = { 0.0f,0.5f,0.0f,1.0f };
+	vertexDate[1].texcode = { 0.5f,0.0f };
 
-	vertexDate[2] = { 0.5f,-0.5f,0.0f,1.0f };
+	vertexDate[2].position = { 0.5f,-0.5f,0.0f,1.0f };
+	vertexDate[2].texcode = { 1.0f,1.0f };
 
 
 	D3D12_VIEWPORT viewPort{};
@@ -846,6 +896,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	textureSrvHeapHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		 
 	device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHeapHandleCPU);
+
+
+
 
 
 	while (msg.message != WM_QUIT)
@@ -924,6 +977,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHeapHandleGPU);
 
 			commandList->DrawInstanced(3, 1, 0, 0);
 
