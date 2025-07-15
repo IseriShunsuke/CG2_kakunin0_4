@@ -150,16 +150,7 @@ Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Ve
 }
 
 
-Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip)
-{
-	float cotHalfFovV = 1.0f / std::tan(fovY / 2.0f);
-	return {
-		(cotHalfFovV / aspectRatio), 0.0f, 0.0f, 0.0f,
-		0.0f, cotHalfFovV, 0.0f, 0.0f,
-		0.0f, 0.0f, farClip / (farClip - nearClip), 1.0f,
-		0.0f, 0.0f, -(nearClip * farClip) / (farClip - nearClip), 0.0f
-	};
-}
+
 
 Matrix4x4 Inverse(const Matrix4x4& m) {
 	float determinant = +m.m[0][0] * m.m[1][1] * m.m[2][2] * m.m[3][3]
@@ -486,6 +477,53 @@ void UpLoadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mip
 
 		assert(SUCCEEDED(hr));
 	}
+}
+
+Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRotation, float nearClip, float farClip)
+{
+	Matrix4x4 result;
+	result.m[0][0] = (1 / aspectRotation) * (1 / std::tan(fovY / 2));
+	result.m[0][1] = 0;
+	result.m[0][2] = 0;
+	result.m[0][3] = 0;
+	result.m[1][0] = 0;
+	result.m[1][1] = 1 / std::tan(fovY / 2);
+	result.m[1][2] = 0;
+	result.m[1][3] = 0;
+	result.m[2][0] = 0;
+	result.m[2][1] = 0;
+	result.m[2][2] = farClip / (farClip - nearClip);
+	result.m[2][3] = 1;
+	result.m[3][0] = 0;
+	result.m[3][1] = 0;
+	result.m[3][2] = (-nearClip * farClip) / (farClip - nearClip);
+	result.m[3][3] = 0;
+
+	return result;
+
+}
+
+Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float bottom, float nearClip, float farClip)
+{
+	Matrix4x4 result;
+	result.m[0][0] = 2 / (right - left);
+	result.m[0][1] = 0;
+	result.m[0][2] = 0;
+	result.m[0][3] = 0;
+	result.m[1][0] = 0;
+	result.m[1][1] = 2 / (top - bottom);
+	result.m[1][2] = 0;
+	result.m[1][3] = 0;
+	result.m[2][0] = 0;
+	result.m[2][1] = 0;
+	result.m[2][2] = 1 / (farClip - nearClip);
+	result.m[2][3] = 0;
+	result.m[3][0] = (left + right) / (left - right);
+	result.m[3][1] = (top + bottom) / (bottom - top);
+	result.m[3][2] = nearClip / (nearClip - farClip);
+	result.m[3][3] = 1;
+
+	return result;
 }
 
 
@@ -849,6 +887,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 
 	
+	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
+
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
+
+	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
+	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
+	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
+
 
 	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 6);
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
@@ -869,6 +915,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	VertexData* vertexDate = nullptr;
 
+
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexDate));
 
 	vertexDate[0].position = { -0.5f,-0.5f,0.0f,1.0f };
@@ -888,6 +935,28 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	vertexDate[5].position = { 0.5f,-0.5f,-0.5f,1.0f };
 	vertexDate[5].texcode = { 1.0f,1.0f };
+
+
+	VertexData* vertexDateSprite = nullptr;
+
+	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDateSprite));
+	vertexDateSprite[0].position = { 0.0f,360.0f,0.0f,1.0f };
+	vertexDateSprite[0].texcode = { 0.0f,1.0f };
+
+	vertexDateSprite[1].position = { 0.0f,0.0f,0.0f,1.0f };
+	vertexDateSprite[1].texcode = { 0.0f,0.0f };
+
+	vertexDateSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };
+	vertexDateSprite[2].texcode = { 1.0f,1.0f };
+
+	vertexDateSprite[3].position = { 0.0f,0.0f,0.0f,1.0f };
+	vertexDateSprite[3].texcode = { 0.0f,0.0f };
+
+	vertexDateSprite[4].position = { 640.0f,0.0f,0.0f,1.0f };
+	vertexDateSprite[4].texcode = { 1.0f,0.0f };
+
+	vertexDateSprite[5].position = { 640.0f,360.0f,0.0f,1.0f };
+	vertexDateSprite[5].texcode = { 1.0f,1.0f };
 
 
 	D3D12_VIEWPORT viewPort{};
@@ -963,7 +1032,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	device->CreateDepthStencilView(depthStencilResource, &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 
+	ID3D12Resource* transformationMatirxResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
+	Matrix4x4* transformationMatirxDataSprite = nullptr;
+	transformationMatirxResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatirxDataSprite));
+	*transformationMatirxDataSprite = MakeIdentity4x4();
 
+	Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 
 	while (msg.message != WM_QUIT)
@@ -976,6 +1050,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 		else
 		{
+			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
+			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
+			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
+			Matrix4x4 worldViewProjectionMatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
+			*transformationMatirxDataSprite = worldViewProjectionMatrixSprite;
+
 
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
@@ -1053,6 +1133,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			commandList->DrawInstanced(6, 1, 0, 0);
 
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+
+			commandList->SetGraphicsRootConstantBufferView(1, transformationMatirxResourceSprite->GetGPUVirtualAddress());
+
+			commandList->DrawInstanced(6, 1, 0, 0);
+
 
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 
@@ -1086,12 +1172,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			hr = commandList->Reset(commandAllocator, nullptr);
 			assert(SUCCEEDED(hr));
+			
 		}
 	}
 
+	
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
+	
 
 	CloseHandle(fenceEvent);
 	fence->Release();
