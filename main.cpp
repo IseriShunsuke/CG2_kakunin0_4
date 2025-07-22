@@ -935,7 +935,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	vertexDate[5].position = { 0.5f,-0.5f,-0.5f,1.0f };
 	vertexDate[5].texcode = { 1.0f,1.0f };
-
+	//new
 
 	VertexData* vertexDateSprite = nullptr;
 
