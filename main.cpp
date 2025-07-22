@@ -892,7 +892,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
 
 	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
-	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
+	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 4;
 	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
 
 
@@ -935,7 +935,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	vertexDate[5].position = { 0.5f,-0.5f,-0.5f,1.0f };
 	vertexDate[5].texcode = { 1.0f,1.0f };
-
+	//new
 
 	VertexData* vertexDateSprite = nullptr;
 
@@ -949,14 +949,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	vertexDateSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };
 	vertexDateSprite[2].texcode = { 1.0f,1.0f };
 
-	vertexDateSprite[3].position = { 0.0f,0.0f,0.0f,1.0f };
-	vertexDateSprite[3].texcode = { 0.0f,0.0f };
+	vertexDateSprite[3].position = { 640.0f,0.0f,0.0f,1.0f };
+	vertexDateSprite[3].texcode = { 1.0f,0.0f };
 
-	vertexDateSprite[4].position = { 640.0f,0.0f,0.0f,1.0f };
-	vertexDateSprite[4].texcode = { 1.0f,0.0f };
-
-	vertexDateSprite[5].position = { 640.0f,360.0f,0.0f,1.0f };
-	vertexDateSprite[5].texcode = { 1.0f,1.0f };
 
 
 	D3D12_VIEWPORT viewPort{};
@@ -1038,6 +1033,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	*transformationMatirxDataSprite = MakeIdentity4x4();
 
 	Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+
+
+	ID3D12Resource* indexResourceSprite = CreateBufferResource(device, sizeof(uint32_t) * 6);
+
+	D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite{};
+
+	indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
+	indexBufferViewSprite.SizeInBytes = sizeof(uint32_t) * 6;
+	indexBufferViewSprite.Format = DXGI_FORMAT_R32_UINT;
+
+	uint32_t* indexDataSprite = nullptr;
+	indexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite));
+	indexDataSprite[0] = 0; indexDataSprite[1] = 1; indexDataSprite[2] = 2;
+	indexDataSprite[3] = 1; indexDataSprite[4] = 3; indexDataSprite[5] = 2;
+
 
 
 	while (msg.message != WM_QUIT)
@@ -1137,7 +1147,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatirxResourceSprite->GetGPUVirtualAddress());
 
-			commandList->DrawInstanced(6, 1, 0, 0);
+			commandList->IASetIndexBuffer(&indexBufferViewSprite);
+
+			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
@@ -1200,6 +1212,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	signatureBlob->Release();
 	depthStencilResource->Release();
 	dsvDescriptorHeap->Release();
+	indexResourceSprite->Release();
 
 
 	if (errorBlob)
