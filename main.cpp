@@ -26,6 +26,10 @@
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 
+#include <fstream>
+#include <sstream>
+
+
 struct Vector2
 {
 	float x;
@@ -60,6 +64,11 @@ struct Transform {
 	Vector3 scale;
 	Vector3 rotate;
 	Vector3 translate;
+};
+
+struct ModelData 
+{
+	std::vector<VertexData> vertices;
 };
 
 // 単位行列
@@ -561,6 +570,73 @@ ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t 
 }
 
 
+ModelData LoadFile(const std::string& directorPath, const std::string& filename)
+{
+	ModelData modelData;
+	std::vector<Vector4> positions;
+	std::vector<Vector3> normals;
+	std::vector<Vector2> texcoords;
+	std::string line;
+
+	//open file
+	std::ifstream file(directorPath + "/" + filename);
+	assert(file.is_open());
+
+	//read file
+	while (std::getline(file, line))
+	{
+		std::string identifier;
+		std::istringstream s(line);
+		s >> identifier;
+		//read vertex
+		if (identifier == "v")
+		{
+			Vector4 position;
+			s >> position.x >> position.y >> position.z;
+			position.w = 1.0f;
+			positions.push_back(position);
+		}
+		else if (identifier == "vt")
+		{
+			Vector2 texcoord;
+			s >> texcoord.x >> texcoord.y;
+			texcoords.push_back(texcoord);
+		}
+		else if (identifier == "vn")
+		{
+			Vector3 normal;
+			s >> normal.x >> normal.y >> normal.z;
+			normals.push_back(normal);
+		}
+		else if (identifier == "f")
+		{
+			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex)
+			{
+				std::string vertexDefinition;
+				s >> vertexDefinition;
+
+				std::istringstream v(vertexDefinition);
+				uint32_t elementIndice[3];
+				for (int32_t element = 0; element < 3; ++element)
+				{
+					std::string index;
+					std::getline(v, index, '/');
+					elementIndice[element] = std::stoi(index);
+				}
+				Vector4 position = positions[elementIndice[0] - 1];
+				Vector2 texcoord = texcoords[elementIndice[1] - 1];
+				Vector3 normal = normals[elementIndice[2] - 1];
+				VertexData vertex = { position,texcoord};
+				modelData.vertices.push_back(vertex);
+			}
+		}
+		
+	}
+
+	return modelData;
+}
+
+
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
@@ -896,46 +972,63 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
 
 
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 6);
+	//ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 6);
+
+	//D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+
+	//vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
+
+	//vertexBufferView.SizeInBytes = sizeof(VertexData) * 6;
+
+	//vertexBufferView.StrideInBytes = sizeof(VertexData);
+
+
+	//VertexData* vertexDate = nullptr;
+
+
+	//vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexDate));
+
+	//vertexDate[0].position = { -0.5f,-0.5f,0.0f,1.0f };
+	//vertexDate[0].texcode = { 0.0f,1.0f };
+
+	//vertexDate[1].position = { 0.0f,0.5f,0.0f,1.0f };
+	//vertexDate[1].texcode = { 0.5f,0.0f };
+
+	//vertexDate[2].position = { 0.5f,-0.5f,0.0f,1.0f };
+	//vertexDate[2].texcode = { 1.0f,1.0f };
+
+	//vertexDate[3].position = { -0.5f,-0.5f,0.5f,1.0f };
+	//vertexDate[3].texcode = { 0.0f,1.0f };
+
+	//vertexDate[4].position = { 0.0f,0.0f,0.0f,1.0f };
+	//vertexDate[4].texcode = { 0.5f,0.0f };
+
+	//vertexDate[5].position = { 0.5f,-0.5f,-0.5f,1.0f };
+	//vertexDate[5].texcode = { 1.0f,1.0f };
+	////new
+
+	
+	ModelData modelData = LoadFile("resources", "plane.obj");
+
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
+
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
+
+	vertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
+
+	vertexBufferView.StrideInBytes = sizeof(VertexData);
+
+	VertexData* vertexData = nullptr;
+	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	std::memcpy(vertexData, modelData.vertices.data(), sizeof(VertexData)* modelData.vertices.size());
+
+
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
 	Vector4* materialData = nullptr;
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 	*materialData = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
-
-
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-
-	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
-
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 6;
-
-	vertexBufferView.StrideInBytes = sizeof(VertexData);
-
-
-	VertexData* vertexDate = nullptr;
-
-
-	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexDate));
-
-	vertexDate[0].position = { -0.5f,-0.5f,0.0f,1.0f };
-	vertexDate[0].texcode = { 0.0f,1.0f };
-
-	vertexDate[1].position = { 0.0f,0.5f,0.0f,1.0f };
-	vertexDate[1].texcode = { 0.5f,0.0f };
-
-	vertexDate[2].position = { 0.5f,-0.5f,0.0f,1.0f };
-	vertexDate[2].texcode = { 1.0f,1.0f };
-
-	vertexDate[3].position = { -0.5f,-0.5f,0.5f,1.0f };
-	vertexDate[3].texcode = { 0.0f,1.0f };
-
-	vertexDate[4].position = { 0.0f,0.0f,0.0f,1.0f };
-	vertexDate[4].texcode = { 0.5f,0.0f };
-
-	vertexDate[5].position = { 0.5f,-0.5f,-0.5f,1.0f };
-	vertexDate[5].texcode = { 1.0f,1.0f };
-	//new
 
 	VertexData* vertexDateSprite = nullptr;
 
@@ -951,6 +1044,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	vertexDateSprite[3].position = { 640.0f,0.0f,0.0f,1.0f };
 	vertexDateSprite[3].texcode = { 1.0f,0.0f };
+
 
 
 
@@ -1141,7 +1235,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHeapHandleGPU);
 
-			commandList->DrawInstanced(6, 1, 0, 0);
+			/*commandList->DrawInstanced(6, 1, 0, 0);*/
+
+			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
 
