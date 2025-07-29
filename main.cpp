@@ -1384,7 +1384,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	}
 
 	CoUninitialize();
-	//new
 
 	return 0;
 }
