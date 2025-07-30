@@ -66,10 +66,18 @@ struct Transform {
 	Vector3 translate;
 };
 
-struct ModelData 
+struct MaterialData
+{
+	std::string textureFilePath;
+};
+
+struct ModelData
 {
 	std::vector<VertexData> vertices;
+	MaterialData material;
 };
+
+
 
 // 単位行列
 Matrix4x4 MakeIdentity4x4() {
@@ -570,6 +578,31 @@ ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t 
 }
 
 
+MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename)
+{
+	MaterialData materialData;
+	std::string line;
+	std::ifstream file(directoryPath + "/" + filename);
+	assert(file.is_open());
+
+	while (std::getline(file, line))
+	{
+		std::string identifier;
+		std::istringstream s(line);
+		s >> identifier;
+
+		if (identifier == "map_Kd")
+		{
+			std::string textureFilename;
+			s >> textureFilename;
+			materialData.textureFilePath = directoryPath + "/" + textureFilename;
+		}
+	}
+	return materialData;
+}
+
+
+
 ModelData LoadFile(const std::string& directorPath, const std::string& filename)
 {
 	ModelData modelData;
@@ -610,6 +643,7 @@ ModelData LoadFile(const std::string& directorPath, const std::string& filename)
 		}
 		else if (identifier == "f")
 		{
+			VertexData triangle[3];
 			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex)
 			{
 				std::string vertexDefinition;
@@ -624,18 +658,30 @@ ModelData LoadFile(const std::string& directorPath, const std::string& filename)
 					elementIndice[element] = std::stoi(index);
 				}
 				Vector4 position = positions[elementIndice[0] - 1];
+				position.x *= -1.0f;
 				Vector2 texcoord = texcoords[elementIndice[1] - 1];
+				texcoord.y = 1.0f - texcoord.y;
 				Vector3 normal = normals[elementIndice[2] - 1];
-				VertexData vertex = { position,texcoord};
-				modelData.vertices.push_back(vertex);
+				/*normal.x *= -1.0f;*/
+				/*VertexData vertex = { position,texcoord};
+				modelData.vertices.push_back(vertex);*/
+				triangle[faceVertex] = { position,texcoord };
 			}
+			modelData.vertices.push_back(triangle[2]);
+			modelData.vertices.push_back(triangle[1]);
+			modelData.vertices.push_back(triangle[0]);
+		}
+		else if (identifier == "mtllib")
+		{
+			std::string materialFilename;
+			s >> materialFilename;
+			modelData.material = LoadMaterialTemplateFile(directorPath, materialFilename);
 		}
 		
 	}
 
 	return modelData;
 }
-
 
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
@@ -1064,7 +1110,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	scissorRect.bottom = kClientHeight;
 
 	Transform transform{ {1.0f,1.0f,1.0f,},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-	Transform cameratransform{ {1.0f,1.0f,1.0f,},{0.0f,0.0f,0.0f},{0.0f,0.0f,-5.0f} };
+	Transform cameratransform{ {1.0f,1.0f,1.0f,},{0.0f,0.0f,0.0f},{0.0f,0.0f,-15.0f} };
 
 	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
 
@@ -1087,7 +1133,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		srvDescriptorHeapDesc->GetGPUDescriptorHandleForHeapStart());
 
 
-	DirectX::ScratchImage mipImages = LoadTexture("resource/uvChecker.png");
+	/*DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");*/
+	DirectX::ScratchImage mipImages = LoadTexture(modelData.material.textureFilePath);
 	const DirectX::TexMetadata metadata = mipImages.GetMetadata();
 	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
 	UpLoadTextureData(textureResource, mipImages);
@@ -1167,6 +1214,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			ImGui::Begin("Settings");
 			ImGui::ColorEdit4("material", &materialData->x, ImGuiColorEditFlags_AlphaPreview);
+			ImGui::DragFloat("rotate.y", &transform.rotate.y, 0.1f);
+			ImGui::DragFloat3("transform", &transform.translate.x, 0.1f);
+			ImGui::DragFloat2("sprite transform", &transformSprite.translate.x, 1.0f);
 			ImGui::End();
 
 			ImGui::ShowDemoWindow();
@@ -1187,20 +1237,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-			transform.rotate.y += 0.03f;
+			
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
-			*wvpData = worldMatrix;
+			/**wvpData = worldMatrix;*/
 
-			/*Matrix4x4 cameraMatrix = MakeAffineMatrix(cameratransform.scale, cameratransform.rotate, cameratransform.translate);
+			Matrix4x4 cameraMatrix = MakeAffineMatrix(cameratransform.scale, cameratransform.rotate, cameratransform.translate);
 
 			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
 
 			Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 
-			Matrix4x4 worldVeiwProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));*/
+			Matrix4x4 worldVeiwProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 
-			/**wvpData = worldVeiwProjectionMatrix;*/
+			*wvpData = worldVeiwProjectionMatrix;
 
 			commandList->ResourceBarrier(1, &barrier);
 
